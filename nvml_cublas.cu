@@ -38,6 +38,10 @@
  * high sampling rate by storing nvidia-smi data to RAM
  * and then writing the output to a file once computation
  * is complete.
+ *
+ * This example demonstrates Row-Major to Column-Major conversion handling.
+ * Data is generated in Row-Major format but cuBLAS interprets it as Column-Major.
+ * To compensate, the matrix multiplication order is adjusted to B × A.
  */
 
 /* Includes, system */
@@ -104,6 +108,9 @@ void calculate( int const &m, int const &n, int const &k, nvmlClass &nvml ) {
 
     /* Fill the matrices with test data */
     /* Assume square matrices */
+    /* Note: We generate data in Row-Major format, but cuBLAS interprets it as Column-Major */
+    /* This means matrices are effectively transposed when passed to cuBLAS */
+    /* To compensate, we will compute C = B × A instead of C = A × B */
     for ( int i = 0; i < m * m; i++ ) {
         h_A[i] = std::rand( ) / static_cast<data_type>( RAND_MAX );
         h_B[i] = std::rand( ) / static_cast<data_type>( RAND_MAX );
@@ -124,7 +131,10 @@ void calculate( int const &m, int const &n, int const &k, nvmlClass &nvml ) {
     data_type *d_C_ptr = thrust::raw_pointer_cast( &d_C[0] );
 
     /* Performs operation using cublas */
-    cublasSgemm( handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, d_A_ptr, lda, d_B_ptr, ldb, &beta, d_C_ptr, ldc );
+    /* Note: Since we generate data in Row-Major but cuBLAS uses Column-Major, */
+    /* matrices are effectively transposed. To get correct result, we compute C = B × A */
+    /* This compensates for the Row-Major to Column-Major interpretation difference */
+    cublasSgemm( handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, d_B_ptr, ldb, d_A_ptr, lda, &beta, d_C_ptr, ldc );
     CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     /* Allocate host memory for reading back the result from device memory */
